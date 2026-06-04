@@ -1,0 +1,41 @@
+{
+  "model": "google/gemma-4-31B-it",
+  "model_slug": "google-gemma-4-31b-it",
+  "source": "paper v0.8, Table tab:bioasq (Gemma row)",
+  "n_items_per_cell": 200,
+  "cells": {
+    "cond_b2": {
+      "citation_f1_mean": 0.828,
+      "unsupported_pct": 1.1,
+      "unsupported_ci95": [0.2, 2.2],
+      "n_items": 200,
+      "n_cited": 533
+    },
+    "cond_lit": {
+      "citation_f1_mean": 0.673,
+      "unsupported_pct": 3.3,
+      "unsupported_ci95": [1.7, 5.1],
+      "n_items": 200,
+      "n_cited": 487
+    },
+    "cond_os": {
+      "citation_f1_mean": 0.982,
+      "unsupported_pct": 7.5,
+      "unsupported_ci95": [6.0, 9.1],
+      "n_items": 200,
+      "n_cited": 1698
+    },
+    "cond_pqa": {
+      "citation_f1_mean": 0.762,
+      "unsupported_pct": 10.4,
+      "unsupported_ci95": [8.2, 12.6],
+      "n_items": 200,
+      "n_cited": 906
+    }
+  },
+  "paired_lit_minus_bare_pp": {
+    "point": 2.2,
+    "ci95": [0.8, 3.7],
+    "significant_positive": true
+  }
+}

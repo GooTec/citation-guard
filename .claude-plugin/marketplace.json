@@ -1,0 +1,16 @@
+{
+  "name": "bionexus-citation-guard",
+  "owner": { "name": "BioNexus" },
+  "metadata": {
+    "description": "Local, validated citation-faithfulness guard for openclaude (deterministic alternative to LLM self-verification).",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "citation-guard",
+      "source": "./openclaude-plugin",
+      "description": "The /sci-cite-guard skill: verify each cited sentence against its provided passage with a gold-validated local attribution model, re-attribute mis-cited claims, and flag the unsupported.",
+      "keywords": ["citation", "hallucination", "attribution", "faithfulness", "RAG", "scientific-synthesis"]
+    }
+  ]
+}

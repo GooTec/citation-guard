@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "citation-guard"
+version = "0.1.0"
+description = "Local, validated citation-faithfulness guard for cited scientific synthesis (verify / re-attribute / flag)."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "BioNexus", email = "thkim@bionexus.kr" }]
+keywords = ["hallucination", "citation", "attribution", "faithfulness", "RAG", "scientific-synthesis"]
+dependencies = [
+    "transformers>=4.40",
+    "torch>=2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+citation-guard = "citation_guard.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["citation_guard*"]

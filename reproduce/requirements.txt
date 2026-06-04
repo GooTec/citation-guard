@@ -1,0 +1,31 @@
+# Pin minimal versions for reproducibility.
+# Two isolated venvs are recommended (see scripts/00_setup.sh):
+#   pqavenv → paper-qa + openai
+#   osvenv  → openai + transformers + nltk + spacy
+
+# === vLLM serving (any venv with python 3.10–3.12) ===
+vllm==0.21.0
+
+# === AttrScore verifier (shared, used by 03_guard.py) ===
+transformers>=4.40,<5.0
+torch>=2.0
+sentencepiece
+
+# === PaperQA2 cell (pqavenv) ===
+paper-qa>=5.0
+
+# === OpenScholar cell (osvenv) ===
+openai>=1.0
+nltk
+spacy
+requests
+pandas
+jsonlines
+bs4
+numpy
+
+# === Bootstrap / stats ===
+numpy>=1.23
+
+# === Optional plotting (figures from the paper) ===
+matplotlib

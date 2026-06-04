@@ -1,0 +1,8 @@
+{
+  "name": "citation-guard",
+  "version": "0.1.0",
+  "description": "Local, validated citation-faithfulness guard for cited scientific synthesis (verify / re-attribute / flag). A deterministic replacement for LLM self-verification, which does not reliably catch citation drift.",
+  "author": { "name": "BioNexus" },
+  "license": "MIT",
+  "keywords": ["hallucination", "citation", "attribution", "faithfulness", "RAG", "scientific-synthesis"]
+}
