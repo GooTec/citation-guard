@@ -12,6 +12,43 @@ Then call **`/sci-cite-guard`** after any cited synthesis. The skill **auto-inst
 first use (`pipx`/`pip install citation-guard`), so steps 1–2 below are handled for you. The sections
 below are the manual equivalent / details.
 
+## Worked example: using it locally with openclaude
+
+A typical local session, after the agent has written a cited synthesis over a fixed passage set:
+
+```text
+You:    Summarise what these passages say about LNP protein corona, cite by [N].
+Agent:  Lipid nanoparticles acquire a protein corona that shifts biodistribution [1].
+        The corona is dominated by apolipoproteins [2]. LNPs are also used to bake bread [3].
+You:    /sci-cite-guard
+```
+
+The skill writes the agent's last answer + its `ctxs` to `/tmp/cite_guard_in.json`, runs the local
+3B verifier, and returns:
+
+```text
+## Citation guard (deterministic, AttrScore)
+cited: 3 | verified: 2 | re-attributed: 0 | flagged: 1  -> manual checks reduced ~67%
+
+## Verified answer
+... LNPs are also used to bake bread [3 ⚠UNVERIFIED].
+
+## To check manually (flagged only)
+- "LNPs are also used to bake bread" (cited [3]; no provided passage supports it)
+```
+
+You only re-read the **one flagged** sentence instead of all three. The verified and re-attributed
+sentences are supported by a passage *you provided*, per the gold-validated verifier. Nothing is
+deleted (flag-mode default), so the agent never silently drops a claim.
+
+Without the plugin you get the same result from the shell — the agent (or you) just runs the engine
+directly on the same JSON:
+
+```bash
+citation-guard --input /tmp/cite_guard_in.json --out /tmp/cite_guard_out.json
+# stderr: cited=3 verified=2 re-attributed=0 flagged=1 -> manual checks reduced 67%
+```
+
 ## 1. Install the engine (manual; skill does this automatically)
 ```bash
 pip install citation-guard          # or: pip install -e /path/to/citation-guard
