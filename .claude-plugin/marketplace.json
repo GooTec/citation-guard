@@ -1,6 +1,6 @@
 {
-  "name": "bionexus-citation-guard",
-  "owner": { "name": "BioNexus" },
+  "name": "gootec-citation-guard",
+  "owner": { "name": "GooTec" },
   "metadata": {
     "description": "Local, validated citation-faithfulness guard for openclaude (deterministic alternative to LLM self-verification).",
     "version": "0.1.0"

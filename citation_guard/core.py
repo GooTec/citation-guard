@@ -1,24 +1,31 @@
-"""citation-guard core — a local, validated citation-faithfulness trust layer.
+"""citation-guard core — a local, validated citation-faithfulness guard for cited scientific synthesis.
 
 Given an LLM answer that cites a provided context set by [N], verify each cited sentence against its
-cited passage with a deterministic, gold-validated attribution model (AttrScore); if unsupported,
-re-attribute the claim to a better provided passage; else flag. Unlike LLM self-verification (which is
-unreliable — quality rubrics barely separate answers with 5x more unsupported citations), the decision
-is made by an external, validated verifier. Runs locally (3B model, single GPU or CPU).
+cited passage with a deterministic, gold-validated attribution model (AttrScore, 3B); if unsupported,
+re-attribute the claim to a better provided passage; else flag. The support decision is made by an
+external, gold-validated verifier, not by asking the generator to self-check. Runs locally (single GPU
+or CPU).
+
+Re-attribution is a swappable, commodity slot. The default ranker is a deterministic lexical BM25 (no
+extra model): on gold it recovers the supporting passage about as well as the best open generator and far
+better than the verifier score, while staying free and reproducible. Pass ``reattribute="verifier"`` to
+rank by the attribution score instead. A lexical ranker only *proposes* a candidate; the verifier then
+*re-checks* support before the pointer is moved, so the ranker need not tell support from contradiction.
 
 Scope: checks *attribution locality* (is the claim supported by the cited provided passage), NOT
-conclusion correctness (e.g. in-vitro vs clinical) and NOT whether a reference exists in the world.
-The verifier is moderate (gold kappa ~0.46) and prompt-sensitive; use flag-mode (default) and treat
-the output as a triage, not a guarantee.
+conclusion correctness (e.g. in-vitro vs clinical) and NOT whether a reference exists in the world. The
+verifier is an imperfect instrument validated on gold (supported-class recall ~0.90 on SciFact, ~0.94 on a
+held-out split); a split-conformal layer (see ``reproduce/``) turns its score into a distribution-free
+catch-rate guarantee. Use flag-mode (default) and treat the output as a triage, not a guarantee.
 """
 import math
 import re
 
 ATTR_MODEL = "osunlp/attrscore-flan-t5-xl"
-# Deployed prompt: a deliberately shortened, higher-recall paraphrase of AttrScore's default
-# (SciFact kappa=0.46, recall 0.90 vs the default's kappa=0.33, recall 0.66). The default over-flags
-# inference-requiring supported claims; this one is selected on the supported-class recall axis (the
-# guard's safety requirement) and validated on gold. Prompt choice materially changes results.
+# Deployed prompt: a deliberately shortened, higher-recall paraphrase of AttrScore's default. It is
+# selected on supported-class recall (the guard's safety axis: do not drop genuine citations) -- 0.90 on
+# SciFact vs the canonical prompt's 0.66, and re-validated at 0.94 on a held-out gold split. The canonical
+# prompt over-flags inference-requiring supported claims. Prompt choice materially changes results.
 PROMPT = ("As an Attribution Validator, verify whether the given reference can support the claim. "
           "Answer with Attributable, Extrapolatory, or Contradictory.\nClaim: {c}\nReference: {r}")
 LABELS = ("Attributable", "Extrapolatory", "Contradictory")
@@ -27,6 +34,7 @@ CLAIM_CHARS, REF_CHARS, MAX_LEN = 600, 1500, 1024   # one passage/token budget, 
 SENT = re.compile(r"(?<=[.!?])\s+")
 CITE = re.compile(r"\[\d+(?:\s*,\s*\d+)*\]")   # one citation group: [1] or [1, 2]
 NUM = re.compile(r"\d+")
+WORD = re.compile(r"[a-z0-9]+")                # BM25 tokenizer (lowercased alphanumerics)
 
 _tok = _model = _torch = None
 _lab_ids = None
@@ -83,16 +91,46 @@ def supported(claim: str, ref: str) -> bool:
     return out.strip().lower().startswith("attribut")
 
 
-def guard(answer: str, ctxs, reattribute: bool = True, remove: bool = False):
+def _bm25_best(query: str, cand_idx, texts, k1: float = 1.5, b: float = 0.75):
+    """Rank candidate passages (1-indexed in ``cand_idx``) for ``query`` by BM25 and return the best
+    index, or ``None`` if nothing overlaps. Deterministic, lexical, no model: the default re-attribution
+    ranker. It only proposes a candidate; ``guard()`` re-verifies it with the attribution model before
+    moving the pointer, so a lexical ranker is safe even though it cannot tell support from contradiction."""
+    from collections import Counter
+    toks = {j: WORD.findall(str(texts[j - 1]).lower()) for j in cand_idx}
+    q = WORD.findall(str(query).lower())
+    if not q or not any(toks.values()):
+        return None
+    dl = {j: len(t) for j, t in toks.items()}
+    avgdl = (sum(dl.values()) / len(dl)) or 1.0
+    nc = len(toks)
+    df = {t: sum(1 for tt in toks.values() if t in tt) for t in set(q)}
+    best, best_s = None, 0.0
+    for j, tt in toks.items():
+        tf = Counter(tt)
+        s = 0.0
+        for t in q:
+            f = tf.get(t, 0)
+            if f:
+                idf = math.log((nc - df[t] + 0.5) / (df[t] + 0.5) + 1)
+                s += idf * f * (k1 + 1) / (f + k1 * (1 - b + b * dl[j] / avgdl))
+        if s > best_s:
+            best_s, best = s, j
+    return best
+
+
+def guard(answer: str, ctxs, reattribute=True, remove: bool = False):
     """Run the three-step guard on each cited sentence: verify -> re-attribute -> flag.
 
     For each cited sentence: (1) *verify* the claim against its cited passage(s); if supported, keep.
-    (2) If unsupported and ``reattribute`` is set, *re-attribute* by ranking the other provided
-    passages by P(Attributable) and re-pointing the citation to the top one, but only when that
+    (2) If unsupported and ``reattribute`` is truthy, *re-attribute* by ranking the other provided
+    passages and re-pointing the citation to the top one, but only when the verifier confirms that
     passage actually supports the claim (keep the claim, fix only the pointer). (3) Otherwise *flag*
     the citation as ``[N UNVERIFIED]`` (default; ``remove=True`` drops the sentence instead, opt-in,
     no silent deletion in the default flag-mode).
 
+    reattribute: ``True``/``"bm25"`` (default) ranks candidates with a deterministic lexical BM25;
+        ``"verifier"`` ranks by the attribution score P(Attributable); ``False`` disables re-attribution.
     ctxs: list of dicts with a 'text' field (the provided passages, 1-indexed by [N]).
     Returns (verified_answer, report).
     """
@@ -117,8 +155,11 @@ def guard(answer: str, ctxs, reattribute: bool = True, remove: bool = False):
         if reattribute:
             cands = [j for j in range(1, n + 1) if j not in cs]
             if cands:
-                best = max(cands, key=lambda j: p_attributable(claim, texts[j - 1]))
-                if supported(claim, texts[best - 1]):   # re-verify the top-ranked passage
+                if reattribute == "verifier":
+                    best = max(cands, key=lambda j: p_attributable(claim, texts[j - 1]))
+                else:                                    # default: deterministic BM25 (swappable slot)
+                    best = _bm25_best(claim, cands, texts)
+                if best is not None and supported(claim, texts[best - 1]):   # verifier re-checks before move
                     hit = best
         if hit is not None:
             n_reattr += 1

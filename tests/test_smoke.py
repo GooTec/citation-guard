@@ -33,21 +33,41 @@ def test_three_tier_dispatch(monkeypatch):
     verified, r = guard(answer, ctxs)
     assert r["n_cited"] == 3
     assert r["verified"] == 1        # Alpha [1] -> cited passage 1 supports
-    assert r["re_attributed"] == 1   # Beta [2] -> re-pointed to passage 3 (argmax P(Attributable))
-    assert r["flagged"] == 1         # Zeta [2] -> no provided passage supports
+    assert r["re_attributed"] == 1   # Beta [2] -> re-pointed to passage 3 (BM25 lexical match on "beta")
+    assert r["flagged"] == 1         # Zeta [2] -> no provided passage overlaps, none supports
     assert "[3]" in verified         # re-attribution moved the pointer to passage 3
     assert "UNVERIFIED" in verified  # flag-mode leaves a visible marker, no deletion
 
 
-def test_reattribution_picks_argmax_not_first(monkeypatch):
-    """Re-attribution must rank by P(Attributable), not take the first index-order match."""
-    # passage 1 scores low, passage 3 scores high; the claim cites passage 2 (unsupported).
+def test_bm25_reattribution_is_default(monkeypatch):
+    """Default re-attribution ranks candidates by BM25 (lexical), then the verifier re-checks support."""
+    # The claim shares words with passage 3; passage 1 does not. The verifier confirms any overlap.
+    monkeypatch.setattr(core, "supported", _fake_supported)
+    ctxs = [{"text": "unrelated tokens"}, {"text": "cited but wrong"}, {"text": "mitochondria membrane potential"}]
+    verified, r = guard("Mitochondria membrane potential drives ATP synthesis [2].", ctxs)
+    assert r["re_attributed"] == 1
+    assert "[3]" in verified and "[1]" not in verified
+
+
+def test_verifier_reattribution_ranks_by_score(monkeypatch):
+    """With reattribute='verifier', ranking uses P(Attributable), not lexical overlap."""
+    # No lexical overlap with any candidate, so BM25 would find nothing; the verifier score must drive it.
     monkeypatch.setattr(core, "supported", lambda c, r: "high" in r)
     monkeypatch.setattr(core, "p_attributable", lambda c, r: 0.9 if "high" in r else 0.1)
     ctxs = [{"text": "low score"}, {"text": "cited but unsupported"}, {"text": "high score"}]
-    verified, r = guard("Some claim [2].", ctxs)
+    verified, r = guard("Some claim [2].", ctxs, reattribute="verifier")
     assert r["re_attributed"] == 1
     assert "[3]" in verified and "[1]" not in verified
+
+
+def test_bm25_does_not_use_verifier_score(monkeypatch):
+    """On the default path, a high verifier score on a lexically-unrelated passage is NOT followed."""
+    # BM25 finds no overlap -> nothing proposed -> flagged, even though p_attributable would score passage 3 high.
+    monkeypatch.setattr(core, "supported", lambda c, r: "high" in r)
+    monkeypatch.setattr(core, "p_attributable", lambda c, r: 0.9 if "high" in r else 0.1)
+    ctxs = [{"text": "zzz"}, {"text": "cited"}, {"text": "high score"}]
+    verified, r = guard("Some claim [2].", ctxs)            # default = bm25
+    assert r["flagged"] == 1 and r["re_attributed"] == 0    # no lexical overlap -> BM25 proposes nothing
 
 
 def test_flag_is_default_no_silent_deletion(monkeypatch):

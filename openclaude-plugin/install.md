@@ -1,12 +1,12 @@
 # citation-guard — openclaude integration
 
-Use `citation-guard` inside openclaude as a **deterministic citation trust layer** (a validated
+Use `citation-guard` inside openclaude as a **deterministic citation-faithfulness guard** (a validated
 replacement for the LLM-self-verify `sci-cite-verify` skill).
 
 ## Simplest: one-command plugin install
 ```text
 /plugin marketplace add  https://github.com/GooTec/citation-guard   # or a local clone dir
-/plugin install          citation-guard@bionexus-citation-guard
+/plugin install          citation-guard@gootec-citation-guard
 ```
 Then call **`/sci-cite-guard`** after any cited synthesis. The skill **auto-installs the engine** on
 first use (`pipx`/`pip install citation-guard`), so steps 1–2 below are handled for you. The sections
@@ -94,7 +94,7 @@ the `/sci-cite-guard` skill already does this on demand, which is the recommende
   flag runs by default. Use `--no-reattribute` out-of-domain (where re-attribution ranking is
   unreliable), and `--remove` only when brevity matters more than recall.
 - Scope: checks attribution *locality* (claim ⊆ cited passage), not conclusion correctness or whether a
-  reference exists in the world. Verifier is moderate (gold κ≈0.5) — treat output as triage.
+  reference exists in the world. Verifier is an imperfect instrument (supported-class recall ~0.90 on gold) — treat output as triage.
 - The older `sci-cite-verify` skill (LLM self-verification) is **deprecated** — our data shows LLM
   self-verification does not reliably catch citation drift; use `sci-cite-guard`.
 
@@ -116,7 +116,7 @@ This directory **is** a ready openclaude plugin. Verified against this build's
   "name": "citation-guard",
   "version": "0.1.0",
   "description": "Local, validated citation-faithfulness guard (verify / re-attribute / flag).",
-  "author": { "name": "BioNexus" },
+  "author": { "name": "GooTec" },
   "license": "MIT",
   "keywords": ["hallucination", "citation", "attribution", "faithfulness", "RAG"]
 }

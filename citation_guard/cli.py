@@ -45,6 +45,9 @@ def main(argv=None):
     ap.add_argument("--no-reattribute", action="store_true",
                     help="skip re-attribution (verify then flag only); use out-of-domain, where "
                          "re-attribution ranking is unreliable")
+    ap.add_argument("--reattribute-by", choices=["bm25", "verifier"], default="bm25",
+                    help="re-attribution ranker: bm25 (default, deterministic lexical, no extra model) "
+                         "or verifier (rank by the attribution score)")
     ap.add_argument("--remove", action="store_true",
                     help="drop unsupported cited sentences instead of flagging them "
                          "(opt-in; default is flag-mode, no silent deletion)")
@@ -59,7 +62,7 @@ def main(argv=None):
     raw = Path(a.input).read_text() if a.input else sys.stdin.read()
     data = json.loads(raw)
     verified, report = guard(data.get("answer", ""), data.get("ctxs", []),
-                             reattribute=not a.no_reattribute, remove=a.remove)
+                             reattribute=False if a.no_reattribute else a.reattribute_by, remove=a.remove)
     result = {"verified_answer": verified, "report": report}
 
     r = report

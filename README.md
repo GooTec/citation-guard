@@ -12,14 +12,15 @@ When a large language model writes a literature synthesis that cites a provided 
 attribution model** (AttrScore, 3B) and applies a three-step policy:
 
 - **verify** — the cited passage supports the claim → keep.
-- **re-attribute** — it does not, but another *provided* passage does → re-point the citation (keep the claim).
+- **re-attribute** — it does not, but another *provided* passage does → re-point the citation (keep the
+  claim). Re-attribution is a swappable slot: a deterministic **BM25** ranker (default, no extra model)
+  proposes a candidate and the verifier re-checks support before the pointer is moved; pass
+  `--reattribute-by verifier` to rank by the attribution score instead.
 - **flag** — no provided passage supports it → mark `[N UNVERIFIED]` (default; `--remove` to drop).
 
-Unlike asking the LLM to self-verify its own citations — which our experiments show is unreliable
-(quality-judges barely separate answers with five times more unsupported citations, even when
-explicitly asked) — the decision is made by an **external, validated verifier**. You then re-check
-only the **flagged** citations instead of re-verifying every one (≈ 80–96 % less manual checking in
-our evaluation).
+The support decision is made by an **external, gold-validated verifier**, not by asking the generator to
+self-check. You then re-check only the **flagged** citations instead of re-verifying every one: a few cited
+sentences per hundred at the validated operating point in our evaluation.
 
 Runs **locally** on a single GPU (or CPU) with a 3 B model — no frontier API, no cluster.
 
@@ -69,11 +70,14 @@ citation-guard --input answer.json --no-reattribute --out result.json
 `stderr`: `cited=2 verified=1 re-attributed=0 flagged=1 -> manual checks reduced 50%`
 `stdout` / `--out`: `{"verified_answer": "...[2 UNVERIFIED]...", "report": {...}}`
 
-## Reproduce the paper (1 H100, ≈ 2 hours)
+## Reproduce — minimal cross-domain demo (1 H100, ≈ 2 hours)
 
-A minimal reproducibility kit ships under `reproduce/`. It re-runs **one model × four pipelines** on
-the public BioASQ validation slice (n = 200), then applies the guard + bootstrap CIs + cross-domain
-sanity check.
+A minimal kit ships under `reproduce/`. It is a **cross-domain demonstration**, not the paper's headline:
+it re-runs **one model × four pipelines** on the public BioASQ biomedical slice (n = 200), applies the
+guard with bootstrap CIs, and checks that the QASA-calibrated conformal threshold transfers (a stability
+sanity check). The paper's headline results (verifier matched-catch on SciFact, re-attribution and
+conformal on the full QASA test set, n = 1375) are produced by the experiment scripts described in the
+paper, not by this minimal kit.
 
 ```bash
 cd reproduce
@@ -92,7 +96,7 @@ acceptable tolerance bands.
 
 ```text
 /plugin marketplace add  https://github.com/GooTec/citation-guard   # or a local clone dir
-/plugin install          citation-guard@bionexus-citation-guard
+/plugin install          citation-guard@gootec-citation-guard
 ```
 Then call **`/sci-cite-guard`** after any cited synthesis. The skill auto-installs the pip package
 on first use if it is not found. An opt-in auto-run-after-synthesis hook is documented in
@@ -104,23 +108,28 @@ not affect the Python package.**
 - Checks **attribution locality** (does the cited passage support the claim) — **not** conclusion
   correctness (e.g. in-vitro → clinical over-extrapolation) and **not** whether a reference exists
   in the world.
-- The verifier is **moderate** (gold Cohen's κ ≈ 0.46–0.52) and **prompt-sensitive**; the bundled
-  prompt is the gold-validated configuration from the paper. Treat output as a **triage**
-  (flag-mode default = no silent deletion), not a guarantee. Residual missed-unsupported is bounded
-  by the verifier's recall (≈ 0.90 on gold).
-- A distribution-free **conformal guarantee** (split-conformal calibrated on QASA gold) is provided
-  in `reproduce/scripts/05_conformal_sanity.py` and discussed in the paper §4.
+- The verifier is an **imperfect instrument** and **prompt-sensitive**; the bundled prompt is the
+  gold-validated configuration from the paper (supported-class recall ≈ 0.90 on SciFact, ≈ 0.94 on a
+  held-out split). At a *matched catch rate* it separates supported from unsupported about as well as a
+  strict frontier judge, so it is adopted on cost, not strictness. Treat output as a **triage**
+  (flag-mode default = no silent deletion), not a guarantee.
+- A distribution-free **conformal guarantee** (split-conformal calibrated on QASA gold) turns the
+  verifier's score into a finite-sample bound on the unsupported citations that slip through unflagged;
+  see `reproduce/scripts/05_conformal_sanity.py` and the paper.
 - **Not a sole gate in high-stakes settings.** In patient-facing or otherwise safety-critical
   biomedical contexts the guard must not be the only check; human expert review of every flagged
   **and** verified sentence remains required.
 
 ## How it was validated (paper)
 
-AttrScore chosen over strict NLI (DeBERTa / TRUE NLI, which over-flag 5–7 ×) and frontier GPT-4o on
-SciFact gold (Cohen's κ = 0.46, recall = 0.90); re-validated in-domain on QASA (κ ≈ 0.52); checked
-across four open 27–35 B models (Gemma-4, Qwen3.6) and replicated on the BioASQ biomedical
-benchmark (n = 200, eight cells). See the accompanying Patterns paper for full
-methodology and results.
+On SciFact gold the candidate verifiers (AttrScore-3B, DeBERTa-NLI, GPT-4o, RAGAS, OpenScholar post-hoc)
+separate supported from unsupported comparably at a matched catch rate, so AttrScore-3B is adopted on cost
+(it runs locally) at a high-recall operating point (0.90 on SciFact, 0.94 on a held-out split).
+Re-attribution, the swappable-slot comparison, and conformal calibration are evaluated on the full QASA test
+set (n = 1375): a deterministic BM25 (0.69 recall@1) matches the best open generator's self-attribution far
+more cheaply than the verifier score (0.58). The unsupported-citation rate is reported across four open
+27–35 B models (Gemma-4, Qwen3.6) and three pipelines. See the accompanying paper for full methodology and
+results.
 
 ## Dependencies
 
@@ -135,5 +144,6 @@ the upstream model card on HuggingFace.
 
 ## Cite
 
-If you use `citation-guard` in academic work, please cite the accompanying Patterns paper. A Zenodo DOI for the code
-repository will be issued on first public release.
+If you use `citation-guard` in academic work, please cite the accompanying paper (under review at *ACM
+Transactions on Intelligent Systems and Technology*, Special Issue on LLM-Driven Agentic AI). A Zenodo DOI
+for this repository will be issued on the tagged release.

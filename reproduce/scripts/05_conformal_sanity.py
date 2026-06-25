@@ -7,7 +7,7 @@ We do NOT recompute continuous P(attr) on BioASQ. Instead, we:
   (iii) compare BioASQ binary unsupported% (from 03_guard.py) against the
        1–4% band expected of ScholarQABench bare/lit cells.
 
-This is the cross-domain *stability* sanity check (see paper Supp:bioasq).
+This is the cross-domain *stability* sanity check on BioASQ.
 Bio-unconditional conformal would require bio citation gold, which BioASQ
 ideal answers are not.
 
