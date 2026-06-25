@@ -1,6 +1,6 @@
 # Reproducibility kit — `citation-guard`
 
-**Target**: reproduce the paper's headline numbers on one H100 80 GB in ≈ 2 hours.
+**Target**: a minimal cross-domain demonstration on one H100 80 GB in ~2 hours (not the paper's headline; see the main README).
 
 ```
 reproduce/

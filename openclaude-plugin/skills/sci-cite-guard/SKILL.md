@@ -7,7 +7,7 @@ effort: "low"
 
 # /sci-cite-guard
 
-A **deterministic, local** citation trust layer for cited scientific synthesis. Use it as the
+A **deterministic, local** citation-faithfulness guard for cited scientific synthesis. Use it as the
 post-synthesis check instead of (or after) `/sci-cite-verify`.
 
 ## Why not just ask the model to self-verify?
@@ -16,7 +16,7 @@ post-synthesis check instead of (or after) `/sci-cite-verify`.
 work: even when explicitly asked to score citation support and shown the passages, LLM judges barely
 separate answers with 5× more unsupported citations (per-item corr with the true unsupported rate
 ≈ −0.1 to −0.26). So this skill delegates the decision to a **deterministic attribution model
-(AttrScore, validated on SciFact/QASA gold, κ≈0.5)** rather than the LLM's own judgment.
+(AttrScore, validated on SciFact/QASA gold, supported-class recall ~0.90)** rather than the LLM's own judgment.
 
 ## When to invoke
 
